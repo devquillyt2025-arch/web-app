@@ -12,26 +12,18 @@ export const sectionLabels: Record<SectionKey, string> = {
 
 export const defaultSectionOrder: SectionKey[] = [
   "summary",
-  "education",
   "experience",
   "projects",
   "skills",
+  "education",
   "certifications",
   "languages",
 ];
 
 export const templates: TemplateDefinition[] = [
-  { id: "fresher-classic", name: "Fresher Classic", category: "Fresher", layout: "classic", description: "Simple one-page campus resume" },
-  { id: "fresher-compact", name: "Fresher Compact", category: "Fresher", layout: "compact", description: "Dense layout for internships" },
-  { id: "fresher-campus", name: "Fresher Campus", category: "Fresher", layout: "centered", description: "Clean header for placements" },
-  { id: "fresher-simple", name: "Fresher Simple", category: "Fresher", layout: "accent", description: "Minimal accent line" },
   { id: "professional-clean", name: "Professional Clean", category: "Professional", layout: "classic", description: "ATS-friendly professional format" },
-  { id: "professional-modern", name: "Professional Modern", category: "Professional", layout: "accent", description: "Modern spacing without graphics" },
-  { id: "professional-compact", name: "Professional Compact", category: "Professional", layout: "compact", description: "More content on one page" },
-  { id: "professional-executive", name: "Professional Executive", category: "Professional", layout: "centered", description: "Senior-friendly structure" },
-  { id: "creative-minimal", name: "Creative Minimal", category: "Creative", layout: "accent", description: "Subtle creative styling" },
-  { id: "creative-sidebar", name: "Creative Sidebar", category: "Creative", layout: "sidebar", description: "Left rail for contact and skills" },
-  { id: "creative-accent", name: "Creative Accent", category: "Creative", layout: "accent", description: "Clean layout with color accent" },
+  { id: "professional-compact", name: "Professional Compact", category: "Professional", layout: "compact", description: "Maximizes space for extensive experience" },
+  { id: "creative-sidebar", name: "Creative Sidebar", category: "Creative", layout: "sidebar", description: "Two-column layout with left rail" },
 ];
 
 export const emptyResume: ResumeData = {
@@ -64,7 +56,7 @@ export const emptyResume: ResumeData = {
   certifications: [],
   languages: [],
   settings: {
-    templateId: "fresher-classic",
+    templateId: "professional-clean",
     accentColor: "#2563eb",
     sectionOrder: defaultSectionOrder,
   },
@@ -83,18 +75,6 @@ export const sampleResume: ResumeData = {
     summary:
       "Frontend developer focused on building fast, accessible web interfaces with React, TypeScript, and clean UI systems.",
   },
-  education: [
-    {
-      id: "edu-1",
-      institution: "Visvesvaraya Technological University",
-      degree: "B.Tech",
-      field: "Computer Science",
-      startDate: "2020",
-      endDate: "2024",
-      location: "Karnataka",
-      score: "CGPA 8.4",
-    },
-  ],
   experience: [
     {
       id: "exp-1",
@@ -120,13 +100,25 @@ export const sampleResume: ResumeData = {
     { id: "skill-1", title: "Frontend", skills: "React, TypeScript, JavaScript, HTML, CSS" },
     { id: "skill-2", title: "Tools", skills: "Git, Vite, Figma, Chrome DevTools" },
   ],
+  education: [
+    {
+      id: "edu-1",
+      institution: "Visvesvaraya Technological University",
+      degree: "B.Tech",
+      field: "Computer Science",
+      startDate: "Aug 2020",
+      endDate: "May 2024",
+      location: "Karnataka",
+      score: "CGPA 8.4",
+    },
+  ],
   certifications: [{ id: "cert-1", name: "Responsive Web Design", issuer: "freeCodeCamp", year: "2023" }],
   languages: [
     { id: "lang-1", name: "English", level: "Professional" },
     { id: "lang-2", name: "Hindi", level: "Native" },
   ],
   settings: {
-    templateId: "fresher-classic",
+    templateId: "professional-clean",
     accentColor: "#2563eb",
     sectionOrder: defaultSectionOrder,
   },

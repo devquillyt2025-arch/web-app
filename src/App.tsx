@@ -165,6 +165,32 @@ export default function App() {
       </header>
 
       <main className="builder-grid">
+        <section className={`preview-panel ${mobileView === "edit" ? "hide-mobile" : ""}`}>
+          <div className="preview-toolbar">
+            <div>
+              <strong>{selectedTemplate.name}</strong>
+              <span>{selectedTemplate.category} template</span>
+            </div>
+            <label className="color-control">
+              <Palette size={16} />
+              <input
+                type="color"
+                value={resume.settings.accentColor}
+                onChange={(event) => updateResume((r) => ({ ...r, settings: { ...r.settings, accentColor: event.target.value } }))}
+              />
+            </label>
+            <button className="ghost" onClick={printResume}>
+              <Printer size={16} />
+              Print
+            </button>
+          </div>
+          <div className="paper-stage">
+            <div ref={printRef} className="print-area">
+              <ResumeTemplate resume={optimizedResume} template={selectedTemplate} onSectionClick={setActiveSection} />
+            </div>
+          </div>
+        </section>
+
         <aside className={`editor-panel ${mobileView === "preview" ? "hide-mobile" : ""}`}>
           <section
             className={`import-dropzone ${isImporting ? "loading" : ""}`}
@@ -201,13 +227,15 @@ export default function App() {
 
           <TemplateSelector selectedId={resume.settings.templateId} onSelect={switchTemplate} />
 
-          <nav className="section-nav">
-            {defaultSectionOrder.map((section) => (
-              <button key={section} className={activeSection === section ? "active" : ""} onClick={() => setActiveSection(section)}>
-                {sectionLabels[section]}
-              </button>
-            ))}
-          </nav>
+          <section className="nav-block">
+            <nav className="section-nav">
+              {defaultSectionOrder.map((section) => (
+                <button key={section} className={activeSection === section ? "active" : ""} onClick={() => setActiveSection(section)}>
+                  {sectionLabels[section]}
+                </button>
+              ))}
+            </nav>
+          </section>
 
           <section className="form-card">
             {activeSection === "summary" && <PersonalForm resume={resume} patchPersonal={patchPersonal} />}
@@ -291,7 +319,7 @@ export default function App() {
             )}
           </section>
 
-          <section className="form-card small">
+          <section className="form-card">
             <div className="section-title">
               <h2>Section Order</h2>
               <span>Drag to rearrange</span>
@@ -321,10 +349,10 @@ export default function App() {
                   </span>
                   <div>
                     <button aria-label={`Move ${sectionLabels[section]} up`} disabled={index === 0} onClick={() => moveSection(section, -1)}>
-                      <ChevronUp size={15} />
+                      <ChevronUp size={16} />
                     </button>
                     <button aria-label={`Move ${sectionLabels[section]} down`} disabled={index === resume.settings.sectionOrder.length - 1} onClick={() => moveSection(section, 1)}>
-                      <ChevronDown size={15} />
+                      <ChevronDown size={16} />
                     </button>
                   </div>
                 </div>
@@ -332,32 +360,6 @@ export default function App() {
             </div>
           </section>
         </aside>
-
-        <section className={`preview-panel ${mobileView === "edit" ? "hide-mobile" : ""}`}>
-          <div className="preview-toolbar">
-            <div>
-              <strong>{selectedTemplate.name}</strong>
-              <span>{selectedTemplate.category} template</span>
-            </div>
-            <label className="color-control">
-              <Palette size={16} />
-              <input
-                type="color"
-                value={resume.settings.accentColor}
-                onChange={(event) => updateResume((r) => ({ ...r, settings: { ...r.settings, accentColor: event.target.value } }))}
-              />
-            </label>
-            <button className="ghost" onClick={printResume}>
-              <Printer size={16} />
-              Print
-            </button>
-          </div>
-          <div className="paper-stage">
-            <div ref={printRef} className="print-area">
-              <ResumeTemplate resume={optimizedResume} template={selectedTemplate} />
-            </div>
-          </div>
-        </section>
       </main>
     </div>
   );
@@ -500,7 +502,7 @@ function RepeatableList<T extends { id: string }>({
       <div className="section-title">
         <h2>{title}</h2>
         <button className="mini-primary" onClick={onAdd}>
-          <Plus size={15} />
+          <Plus size={16} />
           {addLabel}
         </button>
       </div>
@@ -511,7 +513,7 @@ function RepeatableList<T extends { id: string }>({
             <div className="repeat-head">
               <strong>Entry {index + 1}</strong>
               <button className="icon-danger" aria-label="Remove entry" onClick={() => onRemove(item.id)}>
-                <Trash2 size={15} />
+                <Trash2 size={16} />
               </button>
             </div>
             {render(item)}
@@ -530,12 +532,12 @@ function BulletEditor({ bullets, onChange }: { bullets: string[]; onChange: (bul
         <div className="bullet-row" key={index}>
           <input value={bullet} onChange={(event) => onChange(bullets.map((b, i) => (i === index ? event.target.value : b)))} placeholder="Write a clear achievement" />
           <button aria-label="Remove bullet" onClick={() => onChange(bullets.filter((_, i) => i !== index))}>
-            <Trash2 size={14} />
+            <Trash2 size={16} />
           </button>
         </div>
       ))}
       <button className="mini-button" onClick={() => onChange([...bullets, ""])}>
-        <Plus size={14} />
+        <Plus size={16} />
         Add bullet
       </button>
     </div>
@@ -560,16 +562,16 @@ function TextArea({ label, value, onChange, placeholder = "" }: { label: string;
   );
 }
 
-function ResumeTemplate({ resume, template }: { resume: ResumeData; template: TemplateDefinition }) {
+function ResumeTemplate({ resume, template, onSectionClick }: { resume: ResumeData; template: TemplateDefinition; onSectionClick: (section: SectionKey) => void }) {
   const compact = template.layout === "compact";
   const accent = resume.settings.accentColor;
   const contact = cleanContact(resume);
 
-  const sections = atsSectionOrder.map((key) => <ResumeSection key={key} section={key} resume={resume} compact={compact} />);
+  const sections = atsSectionOrder.map((key) => <ResumeSection key={key} section={key} resume={resume} compact={compact} onClick={() => onSectionClick(key)} />);
 
   return (
     <article className={`resume-page ats-template ${compact ? "compact" : ""}`} style={{ "--accent": accent } as React.CSSProperties}>
-      <header>
+      <header className="clickable-section" onClick={() => onSectionClick("summary")}>
         <h1>{resume.personal.fullName || "Your Name"}</h1>
         <p>{resume.personal.title || "Role / Headline"}</p>
         <div className="resume-contact">{contact.map((item) => <span key={item}>{item}</span>)}</div>
@@ -579,13 +581,13 @@ function ResumeTemplate({ resume, template }: { resume: ResumeData; template: Te
   );
 }
 
-function ResumeSection({ section, resume, compact }: { section: SectionKey; resume: ResumeData; compact: boolean }) {
+function ResumeSection({ section, resume, compact, onClick }: { section: SectionKey; resume: ResumeData; compact: boolean; onClick: () => void }) {
   if (section === "summary" && resume.personal.summary) {
-    return <ResumeBlock title="Summary"><p>{resume.personal.summary}</p></ResumeBlock>;
+    return <ResumeBlock title="Summary" onClick={onClick}><p>{resume.personal.summary}</p></ResumeBlock>;
   }
   if (section === "education" && resume.education.length) {
     return (
-      <ResumeBlock title="Education">
+      <ResumeBlock title="Education" onClick={onClick}>
         {resume.education.map((item) => (
           <ResumeItem
             key={item.id}
@@ -598,7 +600,7 @@ function ResumeSection({ section, resume, compact }: { section: SectionKey; resu
   }
   if (section === "experience" && resume.experience.length) {
     return (
-      <ResumeBlock title="Experience">
+      <ResumeBlock title="Experience" onClick={onClick}>
         {resume.experience.map((item) => (
           <ResumeItem
             key={item.id}
@@ -613,23 +615,23 @@ function ResumeSection({ section, resume, compact }: { section: SectionKey; resu
     );
   }
   if (section === "projects" && resume.projects.length) {
-    return <ResumeBlock title="Projects">{resume.projects.map((item) => <ResumeItem key={item.id} title={item.name} subtitle={item.technologies} meta={[item.link ? "Project Link" : ""]} bullets={item.bullets} compact={compact} />)}</ResumeBlock>;
+    return <ResumeBlock title="Projects" onClick={onClick}>{resume.projects.map((item) => <ResumeItem key={item.id} title={item.name} subtitle={item.technologies} meta={[item.link ? "Project Link" : ""]} bullets={item.bullets} compact={compact} />)}</ResumeBlock>;
   }
   if (section === "skills" && resume.skills.length) {
-    return <ResumeBlock title="Skills"><div className="skill-lines">{resume.skills.map((group) => <p key={group.id}><strong>{group.title}:</strong> {group.skills}</p>)}</div></ResumeBlock>;
+    return <ResumeBlock title="Skills" onClick={onClick}><div className="skill-lines">{resume.skills.map((group) => <p key={group.id}><strong>{group.title}:</strong> {group.skills}</p>)}</div></ResumeBlock>;
   }
   if (section === "certifications" && resume.certifications.length) {
-    return <ResumeBlock title="Certifications">{resume.certifications.map((item) => <ResumeItem key={item.id} title={item.name} meta={[item.issuer, item.year]} />)}</ResumeBlock>;
+    return <ResumeBlock title="Certifications" onClick={onClick}>{resume.certifications.map((item) => <ResumeItem key={item.id} title={item.name} meta={[item.issuer, item.year]} />)}</ResumeBlock>;
   }
   if (section === "languages" && resume.languages.length) {
-    return <ResumeBlock title="Languages"><div className="skill-lines">{resume.languages.map((item) => <p key={item.id}><strong>{item.name}</strong>{item.level ? ` - ${item.level}` : ""}</p>)}</div></ResumeBlock>;
+    return <ResumeBlock title="Languages" onClick={onClick}><div className="skill-lines">{resume.languages.map((item) => <p key={item.id}><strong>{item.name}</strong>{item.level ? ` - ${item.level}` : ""}</p>)}</div></ResumeBlock>;
   }
   return null;
 }
 
-function ResumeBlock({ title, children }: { title: string; children: React.ReactNode }) {
+function ResumeBlock({ title, children, onClick }: { title: string; children: React.ReactNode; onClick: () => void }) {
   return (
-    <section className="resume-block">
+    <section className="resume-block clickable-section" onClick={onClick}>
       <h2>{title}</h2>
       {children}
     </section>

@@ -1,7 +1,7 @@
 import { GlobalWorkerOptions, getDocument } from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
 import { defaultSectionOrder } from "./data";
-import type { EducationItem, ExperienceItem, ProjectItem, ResumeData, SkillGroup } from "./types";
+import type { CertificationItem, EducationItem, ExperienceItem, LanguageItem, ProjectItem, ResumeData, SkillGroup } from "./types";
 
 GlobalWorkerOptions.workerSrc = pdfWorker;
 
@@ -74,6 +74,7 @@ function resumeFromText(text: string, current: ResumeData): ResumeData {
   const lines = cleanLines(text);
   const sectionMap = collectSections(lines);
   const contactText = lines.slice(0, 16).join(" ");
+  
   const email = firstMatch(text, /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
   const phone = firstMatch(text, /(?:\+91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}/);
   const linkedin = firstMatch(text, /(?:https?:\/\/)?(?:www\.)?linkedin\.com\/[^\s,]+/i);
@@ -100,6 +101,8 @@ function resumeFromText(text: string, current: ResumeData): ResumeData {
     experience: guessExperience(sectionMap) || current.experience,
     projects: guessProjects(sectionMap) || current.projects,
     skills: guessSkills(sectionMap) || current.skills,
+    certifications: guessCertifications(sectionMap) || current.certifications,
+    languages: guessLanguages(sectionMap) || current.languages,
     settings: {
       ...current.settings,
       sectionOrder: current.settings.sectionOrder.length ? current.settings.sectionOrder : defaultSectionOrder,
@@ -124,18 +127,27 @@ function collectSections(lines: string[]) {
     experience: ["experience", "work experience", "employment", "professional experience", "internship", "internships"],
     projects: ["projects", "personal projects", "academic projects"],
     skills: ["skills", "technical skills", "core skills", "key skills"],
+    certifications: ["certifications", "courses", "licenses"],
+    languages: ["languages", "spoken languages"]
   };
+  
   const sections: Record<string, string[]> = {};
   let active = "intro";
 
   for (const line of lines) {
-    const normalized = line.toLowerCase().replace(/[:|]/g, "").trim();
-    const next = Object.entries(headings).find(([, names]) => names.includes(normalized));
+    const normalized = line.toLowerCase().replace(/[:|-]/g, "").trim();
+    
+    // More flexible heading matching (starts with)
+    const next = Object.entries(headings).find(([, names]) => 
+      names.some(name => normalized === name || normalized.startsWith(name + " "))
+    );
+    
     if (next) {
       active = next[0];
       sections[active] = sections[active] || [];
       continue;
     }
+    
     sections[active] = sections[active] || [];
     sections[active].push(line);
   }
@@ -169,38 +181,84 @@ function guessSummary(sections: Record<string, string[]>) {
   return summary.filter((line) => line.length > 30 && !line.includes("@")).slice(0, 3).join(" ");
 }
 
+function extractDates(text: string) {
+  const dateRangeRegex = /(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|[0-9]{2}[\/\.-][0-9]{2,4}|\b19\d{2}\b|\b20\d{2}\b).*?[-–to]+.*?(?:Present|Current|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|[0-9]{2}[\/\.-][0-9]{2,4}|\b19\d{2}\b|\b20\d{2}\b)/i;
+  const match = text.match(dateRangeRegex);
+  if (!match) return { start: "", end: "" };
+  
+  const parts = match[0].split(/[-–to]+/);
+  return {
+    start: parts[0]?.trim() || "",
+    end: parts[1]?.trim() || ""
+  };
+}
+
 function guessEducation(sections: Record<string, string[]>): EducationItem[] | null {
   const lines = sections.education || [];
   if (!lines.length) return null;
-  return [
-    {
+
+  const edus: string[][] = [];
+  let current: string[] = [];
+
+  // Chunk array whenever we see a university/college name
+  lines.forEach(line => {
+    if (/(university|college|institute|academy|school)/i.test(line) && current.length > 0) {
+      edus.push(current);
+      current = [line];
+    } else {
+      current.push(line);
+    }
+  });
+  if (current.length) edus.push(current);
+
+  return edus.map(eduLines => {
+    const dates = extractDates(eduLines.join(" "));
+    return {
       id: makeId(),
-      institution: lines[0] || "",
-      degree: lines.find((line) => /(b\.?tech|m\.?tech|bachelor|master|mba|bsc|msc|degree|diploma)/i.test(line)) || "",
-      field: lines.find((line) => /(computer|mechanical|electrical|commerce|science|arts|engineering|business)/i.test(line)) || "",
-      startDate: "",
-      endDate: firstMatch(lines.join(" "), /\b(20\d{2}|19\d{2})\b/),
-      location: "",
-      score: lines.find((line) => /(cgpa|gpa|%|percentage)/i.test(line)) || "",
-    },
-  ];
+      institution: eduLines.find(l => /(university|college|institute|academy|school)/i.test(l)) || eduLines[0] || "",
+      degree: eduLines.find(l => /(b\.?tech|m\.?tech|bachelor|master|mba|bsc|msc|degree|diploma)/i.test(l)) || "",
+      field: eduLines.find(l => /(computer|mechanical|electrical|commerce|science|arts|engineering|business)/i.test(l)) || "",
+      startDate: dates.start,
+      endDate: dates.end || firstMatch(eduLines.join(" "), /\b(20\d{2}|19\d{2})\b/),
+      location: guessLocation(eduLines.join(" ")),
+      score: eduLines.find(l => /(cgpa|gpa|%|percentage)/i.test(l)) || "",
+    };
+  });
 }
 
 function guessExperience(sections: Record<string, string[]>): ExperienceItem[] | null {
   const lines = sections.experience || [];
   if (!lines.length) return null;
-  const description = normalizeImportedText(lines);
-  return [
-    {
+
+  const jobs: string[][] = [];
+  let current: string[] = [];
+  const dateTrigger = /\b(20\d{2}|19\d{2})\b/;
+
+  // Chunk array by dates to capture multiple jobs
+  lines.forEach(line => {
+    if (dateTrigger.test(line) && current.length > 2) {
+      jobs.push(current);
+      current = [line];
+    } else {
+      current.push(line);
+    }
+  });
+  if (current.length) jobs.push(current);
+
+  return jobs.map(jobLines => {
+    const description = normalizeImportedText(jobLines);
+    const dates = extractDates(jobLines.join(" "));
+    
+    return {
       id: makeId(),
-      company: lines.find((line) => /(pvt|ltd|limited|solutions|technologies|systems|inc|company)/i.test(line)) || "",
-      role: lines.find((line) => /(developer|engineer|analyst|designer|manager|intern|consultant)/i.test(line)) || lines[0] || "",
-      startDate: "",
-      endDate: "",
-      location: "",
+      company: jobLines.find(l => /(pvt|ltd|limited|solutions|technologies|systems|inc|company|group)/i.test(l)) || jobLines[0] || "",
+      role: jobLines.find(l => /(developer|engineer|analyst|designer|manager|intern|consultant|lead)/i.test(l)) || "",
+      startDate: dates.start,
+      endDate: dates.end,
+      location: guessLocation(jobLines.join(" ")),
       description,
-    },
-  ];
+    };
+  });
 }
 
 function normalizeImportedText(lines: string[]) {
@@ -268,15 +326,30 @@ function looksLikeRoleOrCompany(line: string) {
 function guessProjects(sections: Record<string, string[]>): ProjectItem[] | null {
   const lines = sections.projects || [];
   if (!lines.length) return null;
-  return [
-    {
+
+  const projs: string[][] = [];
+  let current: string[] = [];
+
+  // Chunk array whenever we see a standard project-looking title (short line)
+  lines.forEach(line => {
+    if (line.length < 40 && !/(react|python|java|sql)/i.test(line) && current.length > 1) {
+      projs.push(current);
+      current = [line];
+    } else {
+      current.push(line);
+    }
+  });
+  if (current.length) projs.push(current);
+
+  return projs.map(projLines => {
+    return {
       id: makeId(),
-      name: lines[0] || "Imported Project",
-      link: firstMatch(lines.join(" "), /(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+\.[a-z]{2,}(?:\/[^\s,]*)?/i),
-      technologies: lines.find((line) => /(react|node|python|java|sql|html|css|typescript|javascript|mongodb|excel)/i.test(line)) || "",
-      bullets: lines.filter((line) => line.length > 25).slice(0, 4),
-    },
-  ];
+      name: projLines[0] || "Imported Project",
+      link: firstMatch(projLines.join(" "), /(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+\.[a-z]{2,}(?:\/[^\s,]*)?/i),
+      technologies: projLines.find(l => /(react|node|python|java|sql|html|css|typescript|javascript|aws|azure)/i.test(l)) || "",
+      bullets: projLines.filter(l => l.length > 25).slice(0, 4),
+    };
+  });
 }
 
 function guessSkills(sections: Record<string, string[]>): SkillGroup[] | null {
@@ -285,10 +358,37 @@ function guessSkills(sections: Record<string, string[]>): SkillGroup[] | null {
   return [
     {
       id: makeId(),
-      title: "Skills",
-      skills: lines.join(", ").replace(/[•|]/g, ",").replace(/,+/g, ",").trim(),
+      title: "Extracted Skills",
+      skills: lines.join(", ").replace(/[•|]/g, ",").replace(/,+/g, ",").replace(/\s+/g, " ").trim(),
     },
   ];
+}
+
+function guessCertifications(sections: Record<string, string[]>): CertificationItem[] | null {
+  const lines = sections.certifications || [];
+  if (!lines.length) return null;
+  
+  // Create a basic list of distinct certification lines
+  return lines.filter(l => l.length > 5).map(line => ({
+    id: makeId(),
+    name: line.replace(/\b(20\d{2}|19\d{2})\b/g, "").trim(),
+    issuer: "",
+    year: firstMatch(line, /\b(20\d{2}|19\d{2})\b/)
+  }));
+}
+
+function guessLanguages(sections: Record<string, string[]>): LanguageItem[] | null {
+  const lines = sections.languages || [];
+  if (!lines.length) return null;
+  
+  const text = lines.join(", ");
+  const langs = text.split(/[,|•]+/).map(l => l.trim()).filter(l => l.length > 2);
+  
+  return langs.map(l => ({
+    id: makeId(),
+    name: l,
+    level: ""
+  }));
 }
 
 function firstMatch(text: string, regex: RegExp) {
