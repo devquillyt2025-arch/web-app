@@ -29,6 +29,7 @@ export type ResumeData = {
     templateId: string;
     accentColor: string;
     sectionOrder: SectionKey[];
+    fontSize: "xs" | "s" | "m" | "l";
   };
 };
 

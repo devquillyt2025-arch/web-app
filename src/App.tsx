@@ -1,8 +1,8 @@
-import { ChevronDown, ChevronUp, Download, Eye, FileText, GripVertical, List, Plus, RotateCcw, Trash2, Upload } from "lucide-react";
+import { ChevronDown, ChevronUp, Download, Eye, FileText, GripVertical, List, Plus, Trash2, Upload } from "lucide-react";
 import type * as React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { defaultSectionOrder, emptyResume, sectionLabels, templates } from "./data";
-import { atsSectionOrder, cleanContact, generateHtml, generateMarkdown, optimizeResume } from "./resumeEngine";
+import { atsSectionOrder, cleanContact, optimizeResume } from "./resumeEngine";
 import { clearSavedResume, loadResume, saveResume } from "./storage";
 import type { CertificationItem, EducationItem, ExperienceItem, LanguageItem, ProjectItem, ResumeData, SectionKey, SkillGroup, TemplateDefinition } from "./types";
 
@@ -87,24 +87,8 @@ export default function App() {
     setDragOverSection(null);
   }
 
-  function resetResume() {
-    clearSavedResume();
-    setResume(emptyResume);
-    setActiveSection("summary");
-  }
-
   function printResume() {
     window.print();
-  }
-
-  async function copyMarkdown() {
-    await navigator.clipboard.writeText(generateMarkdown(resume));
-    setSaveState("Markdown copied");
-  }
-
-  async function copyHtml() {
-    await navigator.clipboard.writeText(generateHtml(resume));
-    setSaveState("HTML copied");
   }
 
   async function importPdf(file: File) {
@@ -143,19 +127,6 @@ export default function App() {
           <button className="ghost mobile-only" onClick={() => setMobileView(mobileView === "edit" ? "preview" : "edit")}>
             <Eye size={16} />
             {mobileView === "edit" ? "Preview" : "Edit"}
-          </button>
-          <button className="ghost" onClick={resetResume}>
-            <RotateCcw size={16} />
-            Reset
-          </button>
-          <button className="ghost" onClick={() => setResume(optimizeResume(resume))}>
-            Improve
-          </button>
-          <button className="ghost" onClick={() => void copyMarkdown()}>
-            Markdown
-          </button>
-          <button className="ghost" onClick={() => void copyHtml()}>
-            HTML
           </button>
           <button className="primary" onClick={printResume}>
             <Download size={16} />
@@ -208,6 +179,8 @@ export default function App() {
           </section>
 
           <TemplateSelector selectedId={resume.settings.templateId} onSelect={switchTemplate} />
+
+          <FontSizeSelector selectedSize={resume.settings.fontSize} onSelect={(size) => updateResume((r) => ({ ...r, settings: { ...r.settings, fontSize: size } }))} />
 
           <section className="nav-block">
             <nav className="section-nav">
@@ -359,6 +332,36 @@ function TemplateSelector({ selectedId, onSelect }: { selectedId: string; onSele
           <button key={template.id} className={selectedId === template.id ? "template-card selected" : "template-card"} onClick={() => onSelect(template.id)}>
             <span>{template.name}</span>
             <small>{template.category}</small>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function FontSizeSelector({ selectedSize, onSelect }: { selectedSize: "xs" | "s" | "m" | "l"; onSelect: (size: "xs" | "s" | "m" | "l") => void }) {
+  const sizes = [
+    { id: "xs", label: "XS", name: "Extra Small" },
+    { id: "s", label: "S", name: "Small" },
+    { id: "m", label: "M", name: "Medium" },
+    { id: "l", label: "L", name: "Large" },
+  ] as const;
+
+  return (
+    <section className="template-strip">
+      <div className="section-title">
+        <h2>Font Size</h2>
+        <span>Adjust readability</span>
+      </div>
+      <div className="font-size-grid">
+        {sizes.map((size) => (
+          <button
+            key={size.id}
+            className={selectedSize === size.id ? "font-size-btn selected" : "font-size-btn"}
+            onClick={() => onSelect(size.id)}
+            title={size.name}
+          >
+            {size.label}
           </button>
         ))}
       </div>
@@ -682,7 +685,7 @@ function ResumeTemplate({ resume, template, onSectionClick }: { resume: ResumeDa
   const sections = atsSectionOrder.map((key) => <ResumeSection key={key} section={key} resume={resume} compact={compact} onClick={() => onSectionClick(key)} />);
 
   return (
-    <article className={`resume-page ats-template ${compact ? "compact" : ""}`} style={{ "--accent": accent } as React.CSSProperties}>
+    <article className={`resume-page ats-template ${compact ? "compact" : ""} font-${resume.settings.fontSize}`} style={{ "--accent": accent } as React.CSSProperties}>
       <header className="clickable-section" onClick={() => onSectionClick("summary")}>
         <h1>{resume.personal.fullName || "Your Name"}</h1>
         <div className="resume-contact">{contact.map((item) => <span key={item}>{item}</span>)}</div>

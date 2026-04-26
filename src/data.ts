@@ -59,6 +59,7 @@ export const emptyResume: ResumeData = {
     templateId: "professional-clean",
     accentColor: "#2563eb",
     sectionOrder: defaultSectionOrder,
+    fontSize: "m",
   },
 };
 
@@ -121,5 +122,6 @@ export const sampleResume: ResumeData = {
     templateId: "professional-clean",
     accentColor: "#2563eb",
     sectionOrder: defaultSectionOrder,
+    fontSize: "m",
   },
 };
