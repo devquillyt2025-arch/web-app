@@ -59,6 +59,7 @@ export type ProjectItem = {
   name: string;
   link: string;
   technologies: string;
+  description?: string;
   bullets: string[];
 };
 

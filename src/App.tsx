@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, Download, Eye, FileText, GripVertical, Palette, Plus, Printer, RotateCcw, Trash2, Upload } from "lucide-react";
+import { ChevronDown, ChevronUp, Download, Eye, FileText, GripVertical, List, Plus, RotateCcw, Trash2, Upload } from "lucide-react";
 import type * as React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { defaultSectionOrder, emptyResume, sectionLabels, templates } from "./data";
@@ -10,7 +10,7 @@ const makeId = () => crypto.randomUUID?.() ?? Math.random().toString(36).slice(2
 
 const blankEducation = (): EducationItem => ({ id: makeId(), institution: "", degree: "", field: "", startDate: "", endDate: "", location: "", score: "" });
 const blankExperience = (): ExperienceItem => ({ id: makeId(), company: "", role: "", startDate: "", endDate: "", location: "", description: "" });
-const blankProject = (): ProjectItem => ({ id: makeId(), name: "", link: "", technologies: "", bullets: [""] });
+const blankProject = (): ProjectItem => ({ id: makeId(), name: "", link: "", technologies: "", description: "", bullets: [] });
 const blankSkill = (): SkillGroup => ({ id: makeId(), title: "Skills", skills: "" });
 const blankCertification = (): CertificationItem => ({ id: makeId(), name: "", issuer: "", year: "" });
 const blankLanguage = (): LanguageItem => ({ id: makeId(), name: "", level: "" });
@@ -166,24 +166,6 @@ export default function App() {
 
       <main className="builder-grid">
         <section className={`preview-panel ${mobileView === "edit" ? "hide-mobile" : ""}`}>
-          <div className="preview-toolbar">
-            <div>
-              <strong>{selectedTemplate.name}</strong>
-              <span>{selectedTemplate.category} template</span>
-            </div>
-            <label className="color-control">
-              <Palette size={16} />
-              <input
-                type="color"
-                value={resume.settings.accentColor}
-                onChange={(event) => updateResume((r) => ({ ...r, settings: { ...r.settings, accentColor: event.target.value } }))}
-              />
-            </label>
-            <button className="ghost" onClick={printResume}>
-              <Printer size={16} />
-              Print
-            </button>
-          </div>
           <div className="paper-stage">
             <div ref={printRef} className="print-area">
               <ResumeTemplate resume={optimizedResume} template={selectedTemplate} onSectionClick={setActiveSection} />
@@ -413,29 +395,28 @@ function EducationForm({ item, update }: { item: EducationItem; update: (patch: 
       <Field label="Degree" value={item.degree} onChange={(v) => update({ degree: v })} />
       <Field label="Field" value={item.field} onChange={(v) => update({ field: v })} />
       <Field label="Score" value={item.score} onChange={(v) => update({ score: v })} />
-      <Field label="Start" value={item.startDate} onChange={(v) => update({ startDate: v })} />
-      <Field label="End" value={item.endDate} onChange={(v) => update({ endDate: v })} />
+      <MonthYearPicker label="Start" value={item.startDate} onChange={(v) => update({ startDate: v })} />
+      <MonthYearPicker label="End" value={item.endDate} onChange={(v) => update({ endDate: v })} allowPresent />
       <Field label="Location" value={item.location} onChange={(v) => update({ location: v })} />
     </div>
   );
 }
 
 function ExperienceForm({ item, update }: { item: ExperienceItem; update: (patch: Partial<ExperienceItem>) => void }) {
-  const description = item.description ?? item.bullets?.join("\n") ?? "";
   return (
     <>
       <div className="field-grid">
         <Field label="Role" value={item.role} onChange={(v) => update({ role: v })} />
         <Field label="Company" value={item.company} onChange={(v) => update({ company: v })} />
-        <Field label="Start" value={item.startDate} onChange={(v) => update({ startDate: v })} />
-        <Field label="End" value={item.endDate} onChange={(v) => update({ endDate: v })} />
+        <MonthYearPicker label="Start" value={item.startDate} onChange={(v) => update({ startDate: v })} />
+        <MonthYearPicker label="End" value={item.endDate} onChange={(v) => update({ endDate: v })} allowPresent />
         <Field label="Location" value={item.location} onChange={(v) => update({ location: v })} />
       </div>
-      <TextArea
-        label="Experience details"
-        value={description}
-        onChange={(v) => update({ description: v, bullets: undefined })}
-        placeholder="Keep the original text or edit it manually."
+      <DescriptionWithBullets
+        description={item.description ?? ""}
+        bullets={item.bullets ?? []}
+        onUpdate={(patch) => update({ description: patch.description ?? "", bullets: patch.bullets ?? [] })}
+        placeholder="Paste your experience description here, then convert to bullets."
       />
     </>
   );
@@ -449,7 +430,12 @@ function ProjectForm({ item, update }: { item: ProjectItem; update: (patch: Part
         <Field label="Link" value={item.link} onChange={(v) => update({ link: v })} />
         <Field label="Technologies" value={item.technologies} onChange={(v) => update({ technologies: v })} />
       </div>
-      <BulletEditor bullets={item.bullets} onChange={(bullets) => update({ bullets })} />
+      <DescriptionWithBullets
+        description={item.description ?? ""}
+        bullets={item.bullets}
+        onUpdate={(patch) => update({ description: patch.description ?? "", bullets: patch.bullets ?? [] })}
+        placeholder="Describe the project and your contributions, then convert to bullets."
+      />
     </>
   );
 }
@@ -544,6 +530,132 @@ function BulletEditor({ bullets, onChange }: { bullets: string[]; onChange: (bul
   );
 }
 
+function DescriptionWithBullets({
+  description,
+  bullets,
+  onUpdate,
+  placeholder = "Paste your description here, then convert to bullets.",
+}: {
+  description: string;
+  bullets: string[];
+  onUpdate: (patch: { description?: string; bullets?: string[] }) => void;
+  placeholder?: string;
+}) {
+  const hasBullets = bullets.filter(Boolean).length > 0;
+  const textValue = hasBullets
+    ? bullets.map((b) => (b ? `• ${b}` : "")).join("\n")
+    : description;
+
+  function handleChange(v: string) {
+    if (hasBullets) {
+      onUpdate({ bullets: v.split("\n").map((line) => line.replace(/^•\s*/, "")), description: "" });
+    } else {
+      onUpdate({ description: v, bullets: [] });
+    }
+  }
+
+  function convertToBullets() {
+    const lines = textValue
+      .split("\n")
+      .map((line) => line.replace(/^\s*[•·\-*]\s*|\s*\d+[.)]\s*/g, "").trim())
+      .filter(Boolean);
+    if (lines.length) onUpdate({ bullets: lines, description: "" });
+  }
+
+  function revertToText() {
+    onUpdate({ description: bullets.filter(Boolean).join("\n"), bullets: [] });
+  }
+
+  return (
+    <div className="description-field">
+      <label className="field wide">
+        <span>Details</span>
+        <textarea value={textValue} onChange={(e) => handleChange(e.target.value)} placeholder={placeholder} rows={5} />
+      </label>
+      <div className="description-actions">
+        {hasBullets ? (
+          <>
+            <span className="converted-badge">
+              <List size={12} />
+              {bullets.filter(Boolean).length} {bullets.filter(Boolean).length === 1 ? "bullet" : "bullets"}
+            </span>
+            <button className="mini-button" onClick={revertToText}>Edit as text</button>
+          </>
+        ) : (
+          <button className="mini-button" onClick={convertToBullets}>
+            <List size={14} />
+            Convert to bullets
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const CURRENT_YEAR = new Date().getFullYear();
+const YEARS = Array.from({ length: CURRENT_YEAR - 1979 }, (_, i) => String(CURRENT_YEAR - i));
+
+function parseMonthYear(value: string): { month: string; year: string } {
+  if (!value || /^present$/i.test(value.trim())) return { month: "", year: "" };
+  const monthMatch = value.match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/i);
+  const yearMatch = value.match(/\b(19|20)\d{2}\b/);
+  return {
+    month: monthMatch ? monthMatch[0].slice(0, 1).toUpperCase() + monthMatch[0].slice(1, 3).toLowerCase() : "",
+    year: yearMatch ? yearMatch[0] : "",
+  };
+}
+
+function MonthYearPicker({
+  label,
+  value,
+  onChange,
+  allowPresent = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  allowPresent?: boolean;
+}) {
+  const isPresent = /^present$/i.test(value.trim());
+  const { month, year } = parseMonthYear(value);
+
+  function emit(newMonth: string, newYear: string) {
+    if (!newMonth && !newYear) onChange("");
+    else onChange([newMonth, newYear].filter(Boolean).join(" "));
+  }
+
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <div className="date-select-group">
+        <select value={isPresent ? "" : month} disabled={isPresent} onChange={(e) => emit(e.target.value, year)}>
+          <option value="">Month</option>
+          {MONTHS.map((m) => (
+            <option key={m} value={m}>{m}</option>
+          ))}
+        </select>
+        <select value={isPresent ? "" : year} disabled={isPresent} onChange={(e) => emit(month, e.target.value)}>
+          <option value="">Year</option>
+          {YEARS.map((y) => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+      </div>
+      {allowPresent && (
+        <label className="present-checkbox">
+          <input
+            type="checkbox"
+            checked={isPresent}
+            onChange={(e) => onChange(e.target.checked ? "Present" : "")}
+          />
+          Present
+        </label>
+      )}
+    </label>
+  );
+}
+
 function Field({ label, value, onChange, placeholder = "" }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string }) {
   return (
     <label className="field">
@@ -573,7 +685,6 @@ function ResumeTemplate({ resume, template, onSectionClick }: { resume: ResumeDa
     <article className={`resume-page ats-template ${compact ? "compact" : ""}`} style={{ "--accent": accent } as React.CSSProperties}>
       <header className="clickable-section" onClick={() => onSectionClick("summary")}>
         <h1>{resume.personal.fullName || "Your Name"}</h1>
-        <p>{resume.personal.title || "Role / Headline"}</p>
         <div className="resume-contact">{contact.map((item) => <span key={item}>{item}</span>)}</div>
       </header>
       {sections}
@@ -607,6 +718,7 @@ function ResumeSection({ section, resume, compact, onClick }: { section: Section
             title={item.role}
             subtitle={item.company}
             meta={[item.location, dateRange(item.startDate, item.endDate)]}
+            description={item.bullets?.filter(Boolean).length ? "" : (item.description ?? "")}
             bullets={item.bullets || []}
             compact={compact}
           />
@@ -615,7 +727,21 @@ function ResumeSection({ section, resume, compact, onClick }: { section: Section
     );
   }
   if (section === "projects" && resume.projects.length) {
-    return <ResumeBlock title="Projects" onClick={onClick}>{resume.projects.map((item) => <ResumeItem key={item.id} title={item.name} subtitle={item.technologies} meta={[item.link ? "Project Link" : ""]} bullets={item.bullets} compact={compact} />)}</ResumeBlock>;
+    return (
+      <ResumeBlock title="Projects" onClick={onClick}>
+        {resume.projects.map((item) => (
+          <ResumeItem
+            key={item.id}
+            title={item.name}
+            subtitle={item.technologies}
+            meta={[item.link ? "Project Link" : ""]}
+            description={item.bullets.filter(Boolean).length ? "" : (item.description ?? "")}
+            bullets={item.bullets}
+            compact={compact}
+          />
+        ))}
+      </ResumeBlock>
+    );
   }
   if (section === "skills" && resume.skills.length) {
     return <ResumeBlock title="Skills" onClick={onClick}><div className="skill-lines">{resume.skills.map((group) => <p key={group.id}><strong>{group.title}:</strong> {group.skills}</p>)}</div></ResumeBlock>;
